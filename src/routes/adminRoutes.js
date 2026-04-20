@@ -8,6 +8,7 @@ const ReadingTest = require("../modal/ReadingModal");
 const WritingTest = require("../modal/WritingModal");
 const FullTest = require("../modal/FullTestModal");
 const TestSeries = require("../modal/TestseriesModel");
+const { uploadImage, uploadAudio } = require("../config/cloudinary");
 
 const TEST_MODELS = {
   listening: ListeningTest,
@@ -94,19 +95,21 @@ router.get("/tests/:type", async (req, res) => {
     if (!Model)
       return res.status(400).json({ success: false, message: "Invalid type" });
 
-    const page     = parseInt(req.query.page)  || 1;
-    const limit    = parseInt(req.query.limit) || 10;
-    const skip     = (page - 1) * limit;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
     const seriesId = req.query.seriesId?.trim(); // ← just add .trim()
     const search = req.query.search;
-    
+
     const query = {};
     if (seriesId) query.seriesId = seriesId;
-    if (search)   query.title    = { $regex: search, $options: "i" };
+    if (search) query.title = { $regex: search, $options: "i" };
 
     const [tests, total] = await Promise.all([
       Model.find(query)
-        .select("-sections.questions.answer -passages.questionGroups.questions.answer -tasks.modelAnswer")
+        .select(
+          "-sections.questions.answer -passages.questionGroups.questions.answer -tasks.modelAnswer",
+        )
         .sort({ seriesId: 1, testNumber: 1 })
         .skip(skip)
         .limit(limit)
@@ -199,12 +202,10 @@ router.post("/tests/:type", async (req, res) => {
     res.status(201).json({ success: true, data: doc });
   } catch (err) {
     if (err.code === 11000)
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: "Test with this series + number already exists",
-        });
+      return res.status(409).json({
+        success: false,
+        message: "Test with this series + number already exists",
+      });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -316,27 +317,156 @@ router.delete("/series/:id", async (req, res) => {
 // FILE UPLOADS
 // =============================================================================
 
-router.post("/upload/audio", async (req, res) => {
-  // TODO: replace with Cloudinary or S3
-  // const multer = require("multer");
-  // const { CloudinaryStorage } = require("multer-storage-cloudinary");
-  // const storage = new CloudinaryStorage({ cloudinary, params: { folder: "iltsmill/audio", resource_type: "video" } });
-  // const upload = multer({ storage });
-  // then do: upload.single("audio") as middleware and return req.file.path
-  res.json({
-    success: true,
-    url: `/audio/placeholder-${Date.now()}.mp3`,
-    message: "Dummy upload — connect Cloudinary or S3",
+// Route for single audio upload
+// In your route file
+router.post("/upload/audio", (req, res) => {
+  uploadAudio.single("audio")(req, res, async (err) => {
+    // Log the actual error, not [object Object]
+    if (err) {
+      console.error('❌ Multer error details:', {
+        message: err.message,
+        code: err.code,
+        stack: err.stack
+      });
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+        code: err.code
+      });
+    }
+    
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No audio file provided"
+        });
+      }
+      
+      console.log('✅ File received:', {
+        originalname: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        path: req.file.path
+      });
+      
+      res.json({
+        success: true,
+        url: req.file.path,
+        publicId: req.file.filename,
+        originalName: req.file.originalname,
+        message: "Audio uploaded successfully"
+      });
+      
+    } catch (error) {
+      // Log the actual error object
+      console.error('❌ Upload error:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to upload audio",
+        errorType: error.name
+      });
+    }
   });
 });
+// Route for multiple audio uploads
+router.post(
+  "/upload/audios",
+  uploadAudio.array("audios", 5),
+  async (req, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No audio files provided",
+        });
+      }
 
-router.post("/upload/image", async (req, res) => {
-  res.json({
-    success: true,
-    url: `/images/placeholder-${Date.now()}.jpg`,
-    message: "Dummy upload — connect Cloudinary or S3",
-  });
+      const uploadedFiles = req.files.map((file) => ({
+        url: file.path,
+        publicId: file.filename,
+        duration: file.duration || null,
+      }));
+
+      res.json({
+        success: true,
+        files: uploadedFiles,
+        count: uploadedFiles.length,
+        message: `${uploadedFiles.length} audio files uploaded successfully`,
+      });
+    } catch (error) {
+      console.error("Multiple audios upload error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to upload audio files",
+      });
+    }
+  },
+);
+
+// single image upload route using Cloudinary
+router.post("/upload/image", uploadImage.single("image"), async (req, res) => {
+  console.log('called')
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image file provided",
+      });
+    }
+
+    res.json({
+      success: true,
+      url: req.file.path, // Cloudinary URL
+      publicId: req.file.filename, // Cloudinary public ID
+      message: "Image uploaded successfully to Cloudinary",
+    });
+  } catch (error) {
+    console.error("Image upload error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload image",
+    });
+  }
 });
+// Route for multiple image uploads
+router.post(
+  "/upload/images",
+  uploadImage.array("images", 10),
+  async (req, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No image files provided",
+        });
+      }
+
+      const uploadedFiles = req.files.map((file) => ({
+        url: file.path,
+        publicId: file.filename,
+      }));
+
+      res.json({
+        success: true,
+        files: uploadedFiles,
+        count: uploadedFiles.length,
+        message: `${uploadedFiles.length} images uploaded successfully`,
+      });
+    } catch (error) {
+      console.error("Multiple images upload error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to upload images",
+      });
+    }
+  },
+);
 
 // =============================================================================
 // HELPER

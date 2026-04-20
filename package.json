@@ -11,10 +11,13 @@
     "start": "nodemon index.js"
   },
   "dependencies": {
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mongodb": "^7.1.1",
-    "mongoose": "^9.4.1"
+    "mongoose": "^9.4.1",
+    "multer": "^2.1.1",
+    "multer-storage-cloudinary": "^4.0.0"
   }
 }

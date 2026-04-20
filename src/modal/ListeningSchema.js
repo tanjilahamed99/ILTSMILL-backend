@@ -16,7 +16,7 @@ const ListeningSectionSchema = new Schema(
       to: { type: Number, required: true },
     },
     questionBlock: { type: QuestionBlockSchema, required: true },
-    // audioUrl: { type: String, required: true, default: "" }, // S3/cloudinary URL
+    audioUrl: { type: String, required: true, default: "" }, // S3/cloudinary URL
     audioDuration: { type: Number, default: 0 }, // seconds
     questions: { type: [QuestionSchema], required: true },
   },
