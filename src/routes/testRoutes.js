@@ -5,12 +5,6 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 
-// const ListeningTest = require("../modal/ListeningSchema");
-// const ReadingTest   = require("../modal/ReadingModal");
-// const WritingTest   = require("../modal/WritingModal");
-// const FullTest      = require("../modal/FullTestModal");
-// const TestSeries    = require("../modal/TestseriesModel");
-
 const ListeningTest = require("../modal/ListeningSchema");
 const ReadingTest = require("../modal/ReadingModal");
 const WritingTest = require("../modal/WritingModal");
@@ -242,120 +236,190 @@ router.post("/attempts/:attemptId/submit", async (req, res) => {
   try {
     const attempt = await TestAttempt.findById(req.params.attemptId);
     if (!attempt)
-      return res
-        .status(404)
-        .json({ success: false, message: "Attempt not found" });
+      return res.status(404).json({ success: false, message: "Attempt not found" });
     if (attempt.status !== "in_progress")
-      return res
-        .status(400)
-        .json({ success: false, message: "Already submitted" });
+      return res.status(400).json({ success: false, message: "Already submitted" });
 
     const { answers = {}, writingResponses = [], timeSpent = 0 } = req.body;
-    const merged = {
-      ...Object.fromEntries(attempt.answers || new Map()),
-      ...answers,
-    };
-    attempt.answers = new Map(Object.entries(merged));
-    attempt.timeSpent = timeSpent;
+
+    // Merge auto-saved answers with final answers
+    const saved  = Object.fromEntries(attempt.answers || new Map());
+    const merged = { ...saved, ...answers };
+
+    attempt.answers     = new Map(Object.entries(merged));
+    attempt.timeSpent   = timeSpent;
     attempt.submittedAt = new Date();
 
-    const bands = [];
+    // ── These are built during scoring and returned to frontend ──────────────
+    const questionResults = [];   // { questionNumber, userAnswer, correctAnswer, isCorrect, isSkipped }
+    const correctAnswers  = {};   // { "1": "James", "15": "B" }
+    const bands           = [];
 
-    // Score listening
-    if (attempt.testType === "listening" || attempt.listeningTestId) {
-      const testDoc = await ListeningTest.findById(
-        attempt.listeningTestId ||
-          (attempt.testType === "listening" &&
-            (await TestAttempt.findById(attempt._id).select(
-              "listeningTestId",
-            ))),
-      );
+    // ════════════════════════════════════════════════════════════════
+    // SCORE LISTENING
+    // ════════════════════════════════════════════════════════════════
+    if (attempt.testType === "listening") {
+      const testDoc = await ListeningTest.findById(attempt.listeningTestId);
+
       if (testDoc) {
-        let totalCorrect = 0;
+        let totalCorrect    = 0;
         const sectionScores = [];
-        testDoc.sections.forEach((s) => {
-          let sc = 0;
-          s.questions.forEach((q) => {
-            if (isCorrect(merged[String(q.questionNumber)], q.answer)) {
+
+        for (const section of testDoc.sections) {
+          let sectionCorrect = 0;
+
+          for (const q of section.questions) {
+            const qNum      = String(q.questionNumber);
+            const userAns   = String(merged[qNum] || "").trim();
+            const isSkipped = userAns === "";
+
+            // Normalise correct answer (handles array answers)
+            const rawCorrect = Array.isArray(q.answer)
+              ? q.answer.join(" / ")
+              : String(q.answer || "");
+
+            // isCorrect check — case-insensitive, trimmed
+            const correct = isCorrect(userAns, q.answer);
+
+            // Save for response
+            correctAnswers[q.questionNumber] = rawCorrect;
+
+            questionResults.push({
+              questionNumber: q.questionNumber,
+              userAnswer:     userAns,
+              correctAnswer:  rawCorrect,
+              isCorrect:      correct,
+              isSkipped,
+            });
+
+            if (correct) {
               totalCorrect++;
-              sc++;
+              sectionCorrect++;
             }
-          });
+          }
+
           sectionScores.push({
-            sectionNumber: s.partNumber,
-            correct: sc,
-            total: s.questions.length,
+            sectionNumber: section.partNumber,
+            correct:       sectionCorrect,
+            total:         section.questions.length,
           });
-        });
-        attempt.listeningScore = totalCorrect;
-        attempt.listeningBand = getListeningBand(totalCorrect);
+        }
+
+        attempt.listeningScore         = totalCorrect;
+        attempt.listeningBand          = getListeningBand(totalCorrect);
         attempt.listeningSectionScores = sectionScores;
         bands.push(attempt.listeningBand);
       }
     }
 
-    // Score reading
-    if (attempt.testType === "reading" || attempt.readingTestId) {
+    // ════════════════════════════════════════════════════════════════
+    // SCORE READING
+    // ════════════════════════════════════════════════════════════════
+    if (attempt.testType === "reading") {
       const testDoc = await ReadingTest.findById(attempt.readingTestId);
+
       if (testDoc) {
-        let totalCorrect = 0;
+        let totalCorrect    = 0;
         const sectionScores = [];
-        testDoc.passages.forEach((p) => {
-          let sc = 0;
-          p.questionGroups?.forEach((g) =>
-            g.questions?.forEach((q) => {
-              if (isCorrect(merged[String(q.questionNumber)], q.answer)) {
+
+        for (const passage of testDoc.passages) {
+          let passageCorrect = 0;
+
+          for (const group of passage.questionGroups || []) {
+            for (const q of group.questions || []) {
+              const qNum      = String(q.questionNumber);
+              const userAns   = String(merged[qNum] || "").trim();
+              const isSkipped = userAns === "";
+
+              const rawCorrect = Array.isArray(q.answer)
+                ? q.answer.join(" / ")
+                : String(q.answer || "");
+
+              const correct = isCorrect(userAns, q.answer);
+
+              correctAnswers[q.questionNumber] = rawCorrect;
+
+              questionResults.push({
+                questionNumber: q.questionNumber,
+                userAnswer:     userAns,
+                correctAnswer:  rawCorrect,
+                isCorrect:      correct,
+                isSkipped,
+              });
+
+              if (correct) {
                 totalCorrect++;
-                sc++;
+                passageCorrect++;
               }
-            }),
-          );
+            }
+          }
+
           sectionScores.push({
-            sectionNumber: p.passageNumber,
-            correct: sc,
-            total: p.questionRange.to - p.questionRange.from + 1,
+            sectionNumber: passage.passageNumber,
+            correct:       passageCorrect,
+            total:         passage.questionRange.to - passage.questionRange.from + 1,
           });
-        });
-        attempt.readingScore = totalCorrect;
-        attempt.readingBand = getReadingBand(totalCorrect, testDoc.testType);
+        }
+
+        attempt.readingScore         = totalCorrect;
+        attempt.readingBand          = getReadingBand(totalCorrect, testDoc.testType);
         attempt.readingSectionScores = sectionScores;
         bands.push(attempt.readingBand);
       }
     }
 
-    // Store writing
+    // ════════════════════════════════════════════════════════════════
+    // STORE WRITING (no auto-score)
+    // ════════════════════════════════════════════════════════════════
     if (writingResponses.length > 0) {
       attempt.writingTaskResults = writingResponses.map((r) => ({
-        taskNumber: r.taskNumber,
+        taskNumber:   r.taskNumber,
         responseText: r.responseText,
-        wordCount:
-          r.responseText?.trim().split(/\s+/).filter(Boolean).length || 0,
-        scoredBy: "none",
+        wordCount:    r.responseText?.trim().split(/\s+/).filter(Boolean).length || 0,
+        scoredBy:     "none",
       }));
     }
 
-    if (bands.length > 0) attempt.overallBand = calcOverallBand(bands);
+    // Overall band
+    if (bands.length > 0) {
+      attempt.overallBand = calcOverallBand(bands);
+    }
 
     attempt.status = "submitted";
     await attempt.save();
 
+    // ── Return EVERYTHING the frontend ResultModal needs ─────────────────────
     res.json({
       success: true,
       result: {
-        attemptId: attempt._id,
-        listeningBand: attempt.listeningBand || null,
-        readingBand: attempt.readingBand || null,
-        writingBand: null,
-        overallBand: attempt.overallBand || null,
-        listeningScore: attempt.listeningScore || null,
-        readingScore: attempt.readingScore || null,
-        totalQuestions: 40,
-        listeningSectionScores: attempt.listeningSectionScores || [],
-        readingSectionScores: attempt.readingSectionScores || [],
+        attemptId:      attempt._id,
+
+        // Scores
+        listeningBand:  attempt.listeningBand  ?? null,
+        readingBand:    attempt.readingBand    ?? null,
+        writingBand:    null,
+        overallBand:    attempt.overallBand    ?? null,
+        listeningScore: attempt.listeningScore ?? null,
+        readingScore:   attempt.readingScore   ?? null,
+        totalQuestions: questionResults.length,
+
+        // Section breakdown
+        listeningSectionScores: attempt.listeningSectionScores ?? [],
+        readingSectionScores:   attempt.readingSectionScores   ?? [],
+
+        // ── THE MISSING PIECES ──────────────────────────────────────
+        questionResults,   // [{ questionNumber, userAnswer, correctAnswer, isCorrect, isSkipped }]
+        correctAnswers,    // { "1": "James", "15": "B", ... }
+        // ────────────────────────────────────────────────────────────
+
+        // Writing
         writingPending: writingResponses.length > 0,
+        timeSpent,
       },
     });
+
   } catch (err) {
+    console.error("Submit error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
