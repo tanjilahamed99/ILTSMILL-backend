@@ -7,15 +7,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 require("dotenv").config();
+app.use(express.urlencoded({ extended: true })); // Parses URL-encoded bodies
+const connectDB = require("./src/db/db");
+connectDB();
 
 const authRoutes = require("./src/routes/authRoutes");
-// const mockRoutes = require("./src/routes/mockRoutes");
 const adminRoutes = require("./src/routes/adminRoutes");
 const testRoutes = require("./src/routes/testRoutes");
 
-const connectDB = require("./src/db/db");
 
-connectDB();
+
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
