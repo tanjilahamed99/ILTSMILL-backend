@@ -19,7 +19,7 @@ connectDB();
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api", testRoutes);
+app.use("/api/test", testRoutes);
 
 app.listen(port, () => {
   console.log(`welcome to iltsmill website`);
