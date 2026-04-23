@@ -461,3 +461,78 @@ exports.getTestAttempts = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.getTotalAttempt = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Validate userId
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    // Get all test attempts for this user
+    const testAttempts = await TestAttempt.find({ userId: userId })
+      .sort({ submittedAt: -1 }) // Sort by most recent first
+      .lean(); // Convert to plain JavaScript objects
+
+    // Calculate statistics
+    const completedTests = testAttempts.filter((t) => t.status === "submitted");
+    const inProgressTests = testAttempts.filter(
+      (t) => t.status === "in_progress",
+    );
+
+    // Calculate average band
+    const bands = completedTests
+      .map((t) => t.overallBand)
+      .filter((b) => b != null);
+    const avgBand =
+      bands.length > 0 ? bands.reduce((a, b) => a + b, 0) / bands.length : null;
+
+    // Calculate best band
+    const bestBand = bands.length > 0 ? Math.max(...bands) : null;
+
+    // Calculate total time spent
+    const totalTimeSpent = completedTests.reduce(
+      (sum, test) => sum + (test.timeSpent || 0),
+      0,
+    );
+
+    // Count by test type
+    const listeningCount = completedTests.filter(
+      (t) => t.testType === "listening",
+    ).length;
+    const readingCount = completedTests.filter(
+      (t) => t.testType === "reading",
+    ).length;
+    const writingCount = completedTests.filter(
+      (t) => t.testType === "writing",
+    ).length;
+    const fullTestCount = completedTests.filter(
+      (t) => t.testType === "full",
+    ).length;
+
+    res.json({
+      success: true,
+      data: {
+        attempts: testAttempts,
+        stats: {
+          total: completedTests.length,
+          inProgress: inProgressTests.length,
+          avgBand: avgBand ? parseFloat(avgBand.toFixed(1)) : null,
+          bestBand: bestBand,
+          totalTimeSpent: totalTimeSpent,
+          listening: listeningCount,
+          reading: readingCount,
+          writing: writingCount,
+          full: fullTestCount,
+        },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

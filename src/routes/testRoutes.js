@@ -16,6 +16,7 @@ const {
   saveTestAttempt,
   getTestAttemptResult,
   submitTestAttempt,
+  getTotalAttempt,
 } = require("../controllers/testController");
 
 const router = Router();
@@ -28,5 +29,7 @@ router.put("/attempts/:attemptId/save", saveTestAttempt);
 router.get("/attempts/:attemptId/result", getTestAttemptResult);
 router.post("/attempts/:attemptId/submit", submitTestAttempt);
 router.get("/attempts", getTestAttempts);
+router.get("/totalAttempt/:userId", getTotalAttempt);
+
 
 module.exports = router;
