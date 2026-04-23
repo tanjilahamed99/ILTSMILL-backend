@@ -189,6 +189,7 @@ exports.startTestAttempt = async (req, res) => {
 exports.saveTestAttempt = async (req, res) => {
   try {
     const attempt = await TestAttempt.findById(req.params.attemptId);
+    console.log(attempt);
     if (!attempt)
       return res
         .status(404)
