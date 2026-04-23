@@ -11,7 +11,7 @@ const TEST_MODELS = {
   listening: ListeningTest,
   reading: ReadingTest,
   writing: WritingTest,
-  full: FullTest,
+  'full-test': FullTest,
 };
 
 // ─── Sanitize helpers ─────────────────────────────────────────────────────────
@@ -83,6 +83,7 @@ function sanitizeTestData(body, type) {
 exports.getTestsByType = async (req, res) => {
   try {
     const { type } = req.params;
+    console.log(type);
     const Model = TEST_MODELS[type];
     if (!Model)
       return res.status(400).json({ success: false, message: "Invalid type" });

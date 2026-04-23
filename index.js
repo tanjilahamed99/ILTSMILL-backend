@@ -16,8 +16,6 @@ const adminRoutes = require("./src/routes/adminRoutes");
 const testRoutes = require("./src/routes/testRoutes");
 
 
-
-
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/test", testRoutes);
