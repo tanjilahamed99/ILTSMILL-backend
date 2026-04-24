@@ -134,7 +134,6 @@ exports.getTestById = async (req, res) => {
 
 exports.startTestAttempt = async (req, res) => {
   try {
-    console.log("called");
     const { testType, testId, userId } = req.body;
     if (!testType || !testId || !userId)
       return res.status(400).json({
@@ -189,7 +188,6 @@ exports.startTestAttempt = async (req, res) => {
 exports.saveTestAttempt = async (req, res) => {
   try {
     const attempt = await TestAttempt.findById(req.params.attemptId);
-    console.log(attempt);
     if (!attempt)
       return res
         .status(404)

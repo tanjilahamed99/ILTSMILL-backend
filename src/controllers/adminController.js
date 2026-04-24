@@ -6,12 +6,13 @@ const WritingTest = require("../modal/WritingModal");
 const FullTest = require("../modal/FullTestModal");
 const TestSeries = require("../modal/TestseriesModel");
 const { uploadImage, uploadAudio } = require("../config/cloudinary");
+const FullTestModal = require("../modal/FullTestModal");
 
 const TEST_MODELS = {
   listening: ListeningTest,
   reading: ReadingTest,
   writing: WritingTest,
-  'full-test': FullTest,
+  "full-test": FullTest,
 };
 
 // ─── Sanitize helpers ─────────────────────────────────────────────────────────
@@ -83,7 +84,6 @@ function sanitizeTestData(body, type) {
 exports.getTestsByType = async (req, res) => {
   try {
     const { type } = req.params;
-    console.log(type);
     const Model = TEST_MODELS[type];
     if (!Model)
       return res.status(400).json({ success: false, message: "Invalid type" });
@@ -261,7 +261,8 @@ exports.deleteTest = async (req, res) => {
 
 exports.createSeries = async (req, res) => {
   try {
-    const doc = await TestSeries.create(req.body);
+    await TestSeries.create(req.body);
+    const doc = await FullTestModal.create(req.body);
     res.status(201).json({ success: true, data: doc });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -315,14 +316,6 @@ exports.uploadSingleAudio = (req, res) => {
           message: "No audio file provided",
         });
       }
-
-      console.log("✅ File received:", {
-        originalname: req.file.originalname,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-        path: req.file.path,
-      });
-
       res.json({
         success: true,
         url: req.file.path,
@@ -391,15 +384,6 @@ exports.uploadSingleImage = (req, res) => {
         message: err.message,
       });
     }
-
-    console.log("📁 File object:", req.file);
-    console.log("🔍 File details:", {
-      hasFile: !!req.file,
-      path: req.file?.path,
-      filename: req.file?.filename,
-      originalname: req.file?.originalname,
-      size: req.file?.size,
-    });
 
     try {
       if (!req.file) {

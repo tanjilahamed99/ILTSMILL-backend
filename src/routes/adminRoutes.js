@@ -21,7 +21,7 @@ const {
 } = require("../controllers/adminController");
 
 router.get("/tests/:type", getTestsByType);
-router.get("/tests/:type/:id", getTestById);
+router.get("/test/:type/:id", getTestById);
 router.get("/series", getSeries);
 router.post("/tests/:type", createTest);
 router.put("/tests/:type/:id", updateTest);

@@ -12,7 +12,7 @@ const FullTestSchema = new Schema(
   {
     // ── Identity ─────────────────────────────────────────────────────────
     seriesId:    { type: String, required: true, index: true },  // "iltsmill-series-13"
-    testNumber:  { type: Number, required: true },               // 1, 2, 3, 4
+    seriesNumber:  { type: Number, required: true },               // 1, 2, 3, 4
     title:       { type: String, required: true },               // "Mock Test - 04"
     slug:        { type: String, unique: true, sparse: true },   // "series-13-full-04"
 

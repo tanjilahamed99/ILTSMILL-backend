@@ -10,7 +10,8 @@ const TestSeriesSchema = new Schema(
   {
     seriesId:     { type: String, required: true, unique: true },  // "iltsmill-series-13"
     seriesNumber: { type: Number, required: true },                 // 13
-    name:         { type: String, required: true },                 // "ILTSMILL Series - 13"
+    name:         { type: String },                 // "ILTSMILL Series - 13"
+    title:         { type: String },                 // "ILTSMILL Series - 13"
 
     isPublished:   { type: Boolean, default: false },
     isFreeScoring: { type: Boolean, default: false },

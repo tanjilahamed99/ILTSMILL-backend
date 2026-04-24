@@ -9,7 +9,6 @@ const generateToken = (id) => {
 
 // Register
 exports.register = async (req, res) => {
-  console.log("Register endpoint hit");
   try {
     const { email, password, name } = req.body;
 
