@@ -30,9 +30,9 @@ function sanitizeQuestion(q) {
     delete out.formFields;
   } else {
     if (Array.isArray(out.formFields)) {
-      out.formFields = out.formFields.filter(
-        (f) => f && (f.label || "").trim() !== "",
-      );
+      // out.formFields = out.formFields.filter(
+      //   (f) => f && (f.label || "").trim() !== "",
+      // );
       if (out.formFields.length === 0) {
         out.formFields = [{ questionNumber: out.questionNumber, label: "" }];
       }
