@@ -7,6 +7,8 @@ const FullTest = require("../modal/FullTestModal");
 const TestSeries = require("../modal/TestseriesModel");
 const { uploadImage, uploadAudio } = require("../config/cloudinary");
 const FullTestModal = require("../modal/FullTestModal");
+const { ReadingSelfPractice } = require("../modal/ReadingSelfPractice");
+const { WritingPractice } = require("../modal/WritingSelfPractice");
 
 const TEST_MODELS = {
   listening: ListeningTest,
@@ -461,3 +463,138 @@ async function updateSeriesCounts(seriesId, type) {
   const count = await Model.countDocuments({ seriesId, isPublished: true });
   await TestSeries.findOneAndUpdate({ seriesId }, { [field]: count });
 }
+
+// ─── CREATE ─────────────────────────────────────────────────────────────────
+exports.createSelfReadingTest = async (req, res) => {
+  try {
+    const { title, level, category, time, passage, difficulty } = req.body;
+    const { type } = req.params;
+
+    // Validate required fields
+    if (!title || !category || !time || !type) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing required fields: title, category, time, passage, type",
+      });
+    }
+
+    let data;
+
+    if (type === "reading") {
+      // Create the reading test
+      data = new ReadingSelfPractice(req.body);
+      await data.save();
+    } else if (type === "writing") {
+      data = new WritingPractice(req.body);
+      await data.save();
+    }
+    res.status(201).json({
+      success: true,
+      message: "test created successfully",
+      data,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ─── UPDATE ─────────────────────────────────────────────────────────────────
+exports.updateSelfReadingTest = async (req, res) => {
+  try {
+    const { id, type } = req.params;
+    const updateData = req.body;
+
+    let updatedTest;
+
+    if (type === "reading") {
+      // Check if test exists
+      const existingTest = await ReadingSelfPractice.findById(id);
+      if (!existingTest) {
+        return res.status(404).json({
+          success: false,
+          message: "Reading test not found",
+        });
+      }
+
+      // Fields that shouldn't be updated directly
+      const restrictedFields = ["_id", "createdAt", "updatedAt"];
+      restrictedFields.forEach((field) => delete updateData[field]);
+
+      updatedTest = await ReadingSelfPractice.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true },
+      );
+    } else if (type === "writing") {
+      // Check if test exists
+      const existingTest = await WritingPractice.findById(id);
+      if (!existingTest) {
+        return res.status(404).json({
+          success: false,
+          message: "Reading test not found",
+        });
+      }
+
+      // Fields that shouldn't be updated directly
+      const restrictedFields = ["_id", "createdAt", "updatedAt"];
+      restrictedFields.forEach((field) => delete updateData[field]);
+
+      updatedTest = await WritingPractice.findByIdAndUpdate(id, updateData, {
+        new: true,
+        runValidators: true,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Reading test updated successfully",
+      data: updatedTest,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ─── DELETE ─────────────────────────────────────────────────────────────────
+exports.deleteSelfReadingTest = async (req, res) => {
+  try {
+    const { id, type } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid test ID format",
+      });
+    }
+
+    if (type === "reading") {
+      const test = await ReadingSelfPractice.findById(id);
+      if (!test) {
+        return res.status(404).json({
+          success: false,
+          message: "Reading test not found",
+        });
+      }
+
+      await ReadingSelfPractice.findByIdAndDelete(id);
+    } else if (type === "writing") {
+      const test = await WritingPractice.findById(id);
+      if (!test) {
+        return res.status(404).json({
+          success: false,
+          message: "Reading test not found",
+        });
+      }
+
+      await WritingPractice.findByIdAndDelete(id);
+    }
+
+    res.json({
+      success: true,
+      message: "Reading test deleted successfully",
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

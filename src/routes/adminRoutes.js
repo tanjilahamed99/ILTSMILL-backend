@@ -18,6 +18,9 @@ const {
   uploadMultipleImages,
   uploadSingleAudio,
   uploadSingleImage,
+  createSelfReadingTest,
+  updateSelfReadingTest,
+  deleteSelfReadingTest,
 } = require("../controllers/adminController");
 
 router.get("/tests/:type", getTestsByType);
@@ -42,5 +45,11 @@ router.post(
   uploadImage.array("images", 10),
   uploadMultipleImages,
 );
+
+// self practice
+
+router.post("/selfPractice/:type", createSelfReadingTest);
+router.put("/selfPractice/:type/:id", updateSelfReadingTest);
+router.delete("/selfPractice/:type/:id", deleteSelfReadingTest);
 
 module.exports = router;

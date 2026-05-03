@@ -13,6 +13,8 @@ const {
   calcOverallBand,
   isCorrect,
 } = require("../utils/bandScore");
+const { ReadingSelfPractice } = require("../modal/ReadingSelfPractice");
+const { WritingPractice } = require("../modal/WritingSelfPractice");
 
 const TEST_MODELS = {
   listening: ListeningTest,
@@ -529,6 +531,109 @@ exports.getTotalAttempt = async (req, res) => {
           full: fullTestCount,
         },
       },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getAllSelfTests = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      level,
+      category,
+      difficulty,
+      search,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    const { type } = req.params;
+
+    // Build filter
+    const filter = {};
+    if (level) filter.level = level;
+    if (category) filter.category = category;
+    if (difficulty) filter.difficulty = difficulty;
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        // passage only exists on reading, but MongoDB ignores missing fields
+        { passage: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sort = { [sortBy]: sortOrder === "desc" ? -1 : 1 };
+
+    // ✅ Fixed: was `let tess` (typo) — must be `let tests`
+    let tests;
+    let total;
+
+    if (type === "reading") {
+      // ✅ Fixed: destructure { ReadingSelfPractice } from the model export
+      tests = await ReadingSelfPractice.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      total = await ReadingSelfPractice.countDocuments(filter);
+    } else if (type === "writing") {
+      tests = await WritingPractice.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      total = await WritingPractice.countDocuments(filter);
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid type. Use 'reading' or 'writing'.",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: tests,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getSelfReadingTestById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if it's a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid test ID format",
+      });
+    }
+
+    const test = await ReadingSelfPractice.findById(id);
+
+    if (!test) {
+      return res.status(404).json({
+        success: false,
+        message: "Reading test not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: test,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

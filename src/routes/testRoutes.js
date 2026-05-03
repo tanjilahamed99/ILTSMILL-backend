@@ -17,9 +17,15 @@ const {
   getTestAttemptResult,
   submitTestAttempt,
   getTotalAttempt,
+  getSelfReadingTestById,
+  getAllSelfTests,
 } = require("../controllers/testController");
 
 const router = Router();
+
+router.get("/selfPractice/:type", getAllSelfTests);
+router.get("/selfPractice/reading/:id", getSelfReadingTestById);
+
 
 router.get("/series", getTestSeries);
 router.get("/:type", getTestsByType);
